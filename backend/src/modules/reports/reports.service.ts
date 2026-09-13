@@ -161,11 +161,28 @@ export async function getDashboardSummary(
         ) <= p.low_stock_threshold
     `,
     prisma.$queryRaw<Array<{ value: { toString(): string } | string | number | null }>>`
-      SELECT COALESCE(SUM(COALESCE(cost_price, 0) * stock_quantity), 0) AS value
-      FROM products
-      WHERE tenant_id = ${tenantId}::uuid
-        AND deleted_at IS NULL
-        AND is_active = true
+      SELECT (
+        COALESCE((
+          SELECT SUM(b.remaining_quantity * b.cost_per_unit)
+          FROM batches b
+          INNER JOIN products p ON p.id = b.product_id
+          WHERE b.tenant_id = ${tenantId}::uuid
+            AND b.status IN ('WAREHOUSE', 'OPEN')
+            AND b.remaining_quantity > 0
+            AND p.deleted_at IS NULL
+            AND p.is_active = true
+            AND p.track_type = 'BATCH'
+        ), 0)
+        +
+        COALESCE((
+          SELECT SUM(COALESCE(p.cost_price, 0) * p.stock_quantity)
+          FROM products p
+          WHERE p.tenant_id = ${tenantId}::uuid
+            AND p.deleted_at IS NULL
+            AND p.is_active = true
+            AND p.track_type = 'SIMPLE'
+        ), 0)
+      ) AS value
     `,
     prisma.product.count({
       where: { tenantId, deletedAt: null, isActive: true },

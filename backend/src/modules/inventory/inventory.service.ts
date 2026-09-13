@@ -434,7 +434,7 @@ export async function listProducts(
 }
 
 export async function getInventorySummary(tenantId: string) {
-  const [products, openBatches, batchCounts] = await Promise.all([
+  const [products, valuedBatches, batchCounts] = await Promise.all([
     prisma.product.findMany({
       where: { tenantId, deletedAt: null, isActive: true },
       select: {
@@ -448,7 +448,12 @@ export async function getInventorySummary(tenantId: string) {
       },
     }),
     prisma.batch.findMany({
-      where: { tenantId, status: 'OPEN', product: { deletedAt: null, isActive: true } },
+      where: {
+        tenantId,
+        status: { in: ['WAREHOUSE', 'OPEN'] },
+        remainingQuantity: { gt: 0 },
+        product: { deletedAt: null, isActive: true },
+      },
       select: {
         productId: true,
         remainingQuantity: true,
@@ -459,7 +464,7 @@ export async function getInventorySummary(tenantId: string) {
   ]);
 
   const batchValueByProduct = new Map<string, { value: number; qty: number; costSum: number }>();
-  for (const b of openBatches) {
+  for (const b of valuedBatches) {
     const rem = Number(b.remainingQuantity);
     const cpu = Number(b.costPerUnit);
     const cur = batchValueByProduct.get(b.productId) ?? { value: 0, qty: 0, costSum: 0 };
@@ -478,12 +483,16 @@ export async function getInventorySummary(tenantId: string) {
   for (const p of products) {
     const sell = Number(p.sellPrice);
     const qty = Number(p.stockQuantity);
-    const batchAgg = p.trackType === 'BATCH' ? batchValueByProduct.get(p.id) : undefined;
 
-    if (batchAgg && batchAgg.qty > 0) {
-      const avgCost = batchAgg.costSum / batchAgg.qty;
-      totalValue += batchAgg.value;
-      projectedProfit += (sell - avgCost) * batchAgg.qty;
+    if (p.trackType === 'BATCH') {
+      // Batch value = remaining share of each batch's purchase cost (WAREHOUSE + OPEN).
+      // Never fall back to product.costPrice × stockQuantity (stale after SIMPLE→BATCH).
+      const batchAgg = batchValueByProduct.get(p.id);
+      if (batchAgg && batchAgg.qty > 0) {
+        const avgCost = batchAgg.costSum / batchAgg.qty;
+        totalValue += batchAgg.value;
+        projectedProfit += (sell - avgCost) * batchAgg.qty;
+      }
     } else {
       const cost = p.costPrice ? Number(p.costPrice) : 0;
       totalValue += cost * qty;
@@ -607,6 +616,11 @@ export async function updateProduct(
   }
 
   const nextTrackType = input.trackType ?? existing.trackType;
+  const convertingToBatch =
+    existing.trackType !== 'BATCH' && nextTrackType === 'BATCH';
+  const convertingToSimple =
+    existing.trackType === 'BATCH' && nextTrackType === 'SIMPLE';
+
   await assertBatchSellPrice(
     nextTrackType,
     input.batchSellPrice !== undefined
@@ -617,7 +631,33 @@ export async function updateProduct(
     await assertShopPartOwned(tenantId, input.partId);
   }
 
+  if (convertingToSimple) {
+    const activeBatches = await prisma.batch.count({
+      where: {
+        tenantId,
+        productId: id,
+        status: { in: ['WAREHOUSE', 'OPEN'] },
+        remainingQuantity: { gt: 0 },
+      },
+    });
+    if (activeBatches > 0) {
+      throw new ValidationError(
+        'Close or finish all warehouse/open batches before switching this product to simple tracking',
+      );
+    }
+  }
+
   const product = await prisma.$transaction(async (tx) => {
+    let costPriceUpdate:
+      | ReturnType<typeof toDecimal>
+      | null
+      | undefined = undefined;
+    if (convertingToBatch) {
+      costPriceUpdate = null;
+    } else if (input.costPrice !== undefined) {
+      costPriceUpdate = input.costPrice == null ? null : toDecimal(input.costPrice);
+    }
+
     const updated = await tx.product.update({
       where: { id },
       data: {
@@ -630,7 +670,8 @@ export async function updateProduct(
         barcode: input.barcode,
         imageUrl: input.imageUrl,
         unit: input.unit,
-        costPrice: input.costPrice != null ? toDecimal(input.costPrice) : undefined,
+        costPrice: costPriceUpdate,
+        ...(convertingToBatch ? { stockQuantity: toDecimal(0) } : {}),
         sellPrice: input.sellPrice != null ? toDecimal(input.sellPrice) : undefined,
         batchSellPrice:
           input.batchSellPrice !== undefined

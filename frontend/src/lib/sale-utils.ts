@@ -1,4 +1,5 @@
 import type { Product } from '@/types/api';
+import { formatQty } from '@/lib/format';
 
 export interface CartLineInput {
   product: Product;
@@ -74,7 +75,7 @@ export function formatProductStock(product: Product): string {
     if (open > 0) parts.push(`${open} open`);
     return parts.length > 0 ? parts.join(' · ') : `${total} batches`;
   }
-  return product.stockQuantity;
+  return formatQty(product.stockQuantity);
 }
 
 export function formatBatchProductPrice(

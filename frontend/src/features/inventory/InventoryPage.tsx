@@ -32,7 +32,7 @@ import {
 } from '@/lib/csv-utils';
 import { FEATURES, hasFeature } from '@/lib/features';
 import { useAuth } from '@/lib/auth';
-import { formatMoney, todayIso } from '@/lib/format';
+import { formatMoney, formatQty, todayIso } from '@/lib/format';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { productMatchesSearch } from '@/lib/search-match';
 import { formatProductStock, formatBatchProductPrice, getStockStatus } from '@/lib/sale-utils';
@@ -465,6 +465,8 @@ export function InventoryPage() {
     onSuccess: () => {
       setModal(null);
       void queryClient.invalidateQueries({ queryKey: ['products'] });
+      void queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
+      void queryClient.invalidateQueries({ queryKey: ['batch-stock-counts'] });
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Could not save product');
@@ -1198,7 +1200,7 @@ export function InventoryPage() {
                 {formatMoney(summary?.inventoryValue ?? '0', currency)}
               </p>
               <p className="mt-1 text-sm text-text-muted">
-                Cost × qty on hand (batch products use each open batch’s cost)
+                Batch: remaining cost of warehouse + open batches · Simple: cost × qty
               </p>
             </div>
           </div>
@@ -1788,6 +1790,17 @@ export function InventoryPage() {
             value={form.trackType}
             onChange={(e) => {
               const trackType = e.target.value as 'SIMPLE' | 'BATCH';
+              const switchingToBatch =
+                trackType === 'BATCH' &&
+                modal === 'edit' &&
+                selected?.trackType !== 'BATCH' &&
+                parseFloat(selected?.stockQuantity ?? '0') > 0;
+              if (switchingToBatch) {
+                const ok = window.confirm(
+                  'Switching to batch clears simple stock and cost from inventory value. Receive batches afterward. Continue?',
+                );
+                if (!ok) return;
+              }
               setForm({
                 ...form,
                 trackType,
@@ -1801,6 +1814,12 @@ export function InventoryPage() {
               { value: 'BATCH', label: 'Batch (gas / pipe / bulk)' },
             ]}
           />
+          {form.trackType === 'BATCH' && modal === 'edit' && selected?.trackType !== 'BATCH' && (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              Simple stock and cost will be cleared. Inventory value will come from batches you
+              receive (warehouse + open).
+            </p>
+          )}
           <Input
             label="Unit"
             value={form.unit}
@@ -2019,7 +2038,9 @@ export function InventoryPage() {
             adjustStock.mutate();
           }}
         >
-          <p className="mb-3 text-sm text-text-muted">Current: {selected?.stockQuantity}</p>
+          <p className="mb-3 text-sm text-text-muted">
+            Current: {formatQty(selected?.stockQuantity)}
+          </p>
           <Input
             label="Quantity change (+/-)"
             type="number"

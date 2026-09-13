@@ -1,7 +1,22 @@
 export function formatMoney(value: string | number, currency = 'PKR'): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (Number.isNaN(num)) return `${currency} 0.00`;
-  return `${currency} ${num.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // en-IN: lakh/crore grouping (1,01,85,070.24) — easier to read for PKR than US grouping
+  return `${currency} ${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** Stock/qty display: whole numbers without .000; keep fractions only when needed. */
+export function formatQty(value: string | number | null | undefined, maxFractionDigits = 3): string {
+  if (value == null || value === '') return '0';
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (!Number.isFinite(num)) return '0';
+  if (Number.isInteger(num) || Math.abs(num - Math.round(num)) < 1e-9) {
+    return String(Math.round(num));
+  }
+  return num.toLocaleString('en-IN', {
+    maximumFractionDigits: maxFractionDigits,
+    minimumFractionDigits: 0,
+  });
 }
 
 export function formatDate(iso: string): string {

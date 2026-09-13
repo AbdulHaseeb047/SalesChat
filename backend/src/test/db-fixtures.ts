@@ -78,6 +78,7 @@ export async function cleanupTestFixture(tenantId: string): Promise<void> {
   await integrationPrisma.saleItem.deleteMany({ where: { tenantId } });
   await integrationPrisma.sale.deleteMany({ where: { tenantId } });
   await integrationPrisma.stockMovement.deleteMany({ where: { tenantId } });
+  await integrationPrisma.batch.deleteMany({ where: { tenantId } });
   await integrationPrisma.auditLog.deleteMany({ where: { tenantId } });
   await integrationPrisma.product.deleteMany({ where: { tenantId } });
   await integrationPrisma.customer.deleteMany({ where: { tenantId } });
