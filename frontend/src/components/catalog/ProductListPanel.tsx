@@ -5,7 +5,7 @@ import { Card, CardHeader } from '@/components/ui/Card';
 import { PageSkeleton } from '@/components/ui/PageSkeleton';
 import { api } from '@/lib/api-client';
 import { formatMoney } from '@/lib/format';
-import { getStockStatus } from '@/lib/sale-utils';
+import { formatProductStock, getStockStatus } from '@/lib/sale-utils';
 
 export function ProductListPanel({
   title,
@@ -94,7 +94,7 @@ export function ProductListPanel({
                             status === 'low' ? 'warning' : status === 'out' ? 'danger' : 'default'
                           }
                         >
-                          {p.stockQuantity}
+                          {formatProductStock(p)}
                         </Badge>
                       ) : (
                         <span className="text-xs text-text-muted">—</span>

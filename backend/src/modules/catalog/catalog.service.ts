@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { NotFoundError } from '../core/errors.js';
+import { NotFoundError, ValidationError } from '../core/errors.js';
 import { prisma } from '../core/prisma.js';
 import { toDecimal } from '../core/money.js';
 import { assertUniqueCompactName, findIdsByCompactSearch } from '../core/text-match.js';
@@ -161,6 +161,11 @@ export async function supplierStockIn(
       where: { id: input.productId, tenantId, deletedAt: null },
     });
     if (!product) throw new NotFoundError('Product not found');
+    if (product.trackType === 'BATCH') {
+      throw new ValidationError(
+        `${product.name} is batch-tracked. Receive stock as warehouse batches in Inventory — supplier stock-in would desync meters from coils.`,
+      );
+    }
 
     const delta = toDecimal(input.quantity);
     const newQty = product.stockQuantity.plus(delta);

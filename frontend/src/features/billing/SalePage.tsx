@@ -23,7 +23,7 @@ import { useAuth } from '@/lib/auth';
 import { formatMoney } from '@/lib/format';
 import { printSaleReceipt } from '@/lib/print-receipt';
 import { resolveReceiptAfterSale } from '@/lib/receipt-prefs';
-import { calcSaleTotals, canAddToCart, getStockStatus, isBatchProduct, needsBatchSaleModal, looseUnitPrice, wholeBatchPrice, billedQuantity, amountFromQty, qtyFromAmount, roundSoldQty, type BatchSaleMode } from '@/lib/sale-utils';
+import { calcSaleTotals, canAddToCart, formatSaleStockBadge, getStockStatus, isBatchProduct, needsBatchSaleModal, looseUnitPrice, wholeBatchPrice, billedQuantity, amountFromQty, qtyFromAmount, roundSoldQty, type BatchSaleMode } from '@/lib/sale-utils';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { productMatchesSearch, customerMatchesSearch } from '@/lib/search-match';
 import type { Customer, HeldCart, Product, ProductBatch, SaleDetail } from '@/types/api';
@@ -488,10 +488,12 @@ export function SalePage() {
       );
       return;
     }
-    if (saleMode === 'LOOSE' && !canAddToCart(batchEntryProduct, qty, 0) && !batchEntryEditKey) {
+    if (saleMode === 'LOOSE' && !batchEntryEditKey) {
       const totalOpen = batchOptions.reduce((s, b) => s + parseFloat(b.remainingQuantity), 0);
       if (qty > totalOpen + 0.0001) {
-        setError(`${batchEntryProduct.name} is out of stock`);
+        setError(
+          `Not enough open counter stock (need ${qty.toFixed(3)} ${batchEntryProduct.unit}, have ${totalOpen.toFixed(3)})`,
+        );
         return;
       }
     }
@@ -1590,7 +1592,7 @@ export function SalePage() {
                                     : 'default'
                               }
                             >
-                              Qty {p.stockQuantity}
+                              {formatSaleStockBadge(p)}
                             </Badge>
                           )}
                         </div>
@@ -1727,7 +1729,7 @@ export function SalePage() {
                           </div>
                           {p.trackStock && (
                             <Badge variant={status === 'low' ? 'warning' : 'default'}>
-                              Qty {p.stockQuantity}
+                              {formatSaleStockBadge(p)}
                             </Badge>
                           )}
                         </div>

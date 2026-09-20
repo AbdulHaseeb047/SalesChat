@@ -25,7 +25,7 @@ npx prisma migrate deploy
 npx prisma db seed
 npm run dev
 
-# terminal 2 — web  http://localhost:3000
+# terminal 2 — web  http://localhost:3003
 cd frontend
 copy .env.example .env.local
 npm install
@@ -34,9 +34,9 @@ npm run dev
 
 On macOS/Linux use `cp` instead of `copy`.
 
-- Marketing: http://localhost:3000
-- Shop login: http://localhost:3000/pos/login
-- Platform admin: http://localhost:3000/admin (after Super Admin login)
+- Marketing: http://localhost:3003
+- Shop login: http://localhost:3003/pos/login
+- Platform admin: http://localhost:3003/admin (after Super Admin login)
 - Health: http://localhost:3001/health
 
 Dev API proxy: the frontend rewrites `/api/:path*` to `http://localhost:3001/:path*` (`NEXT_PUBLIC_API_URL=/api`). Express routes stay at the root (`POST /auth/login`, not `/api/auth/login`).

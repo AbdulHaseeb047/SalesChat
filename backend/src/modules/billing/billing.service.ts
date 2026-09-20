@@ -21,7 +21,11 @@ import {
   allocateLooseBatchSale,
   allocateWholeBatchSale,
   applyBatchAllocations,
+  isWholeBatchSaleLine,
+  restoreBatchQuantity,
   roundQtySold,
+  stockQtyRemoved,
+  stockQtyToRestore,
 } from '../inventory/batch-sale.js';
 import { SYNC_TABLES, syncInsert, syncOutboxEnabled, syncUpdate } from '../sync/sync-payload.js';
 
@@ -700,11 +704,17 @@ export async function voidSale(
   await prisma.$transaction(async (tx) => {
     const sale = await tx.sale.findFirst({
       where: { id: saleId, tenantId },
-      include: { items: true, payments: true },
+      include: { items: true, payments: true, returns: { select: { id: true } } },
     });
 
     if (!sale) throw new NotFoundError('Sale not found');
     if (sale.status === 'VOIDED') throw new ConflictError('Sale already voided');
+    if (sale.returns.length > 0) {
+      throw new ConflictError(
+        'Cannot void a sale that already has returns — stock was already restored on return',
+        'SALE_HAS_RETURNS',
+      );
+    }
 
     const voidedSale = await tx.sale.update({
       where: { id: saleId },
@@ -721,18 +731,31 @@ export async function voidSale(
       const product = await tx.product.findUnique({ where: { id: item.productId } });
       if (!product?.trackStock) continue;
 
+      // Restore actual meters/kg removed (WHOLE coil ≠ billed qty 1).
+      const restoreQty = stockQtyRemoved(item);
+
+      if (item.batchId && product.trackType === 'BATCH') {
+        await restoreBatchQuantity(tx, {
+          tenantId,
+          batchId: item.batchId,
+          restoreQty,
+          reopenAs: isWholeBatchSaleLine(item) ? 'WAREHOUSE' : 'OPEN',
+        });
+      }
+
       const quantityAfter = await incrementProductStock(tx, {
         tenantId,
         productId: product.id,
-        quantity: item.quantity,
+        quantity: restoreQty,
       });
 
       const movement = await tx.stockMovement.create({
         data: {
           tenantId,
           productId: product.id,
+          batchId: item.batchId,
           movementType: 'RETURN',
-          quantityDelta: item.quantity,
+          quantityDelta: restoreQty,
           quantityAfter,
           referenceType: 'sale_void',
           referenceId: saleId,
@@ -1007,18 +1030,35 @@ export async function partialReturn(
       const product = await tx.product.findUnique({ where: { id: ri.productId } });
       if (!product?.trackStock) continue;
 
+      const saleItem = sale.items.find((i) => i.id === ri.saleItemId)!;
+      const restoreQty = stockQtyToRestore({
+        billedQuantity: saleItem.quantity,
+        quantityDeducted: saleItem.quantityDeducted,
+        returnQty: ri.quantity,
+      });
+
+      if (saleItem.batchId && product.trackType === 'BATCH') {
+        await restoreBatchQuantity(tx, {
+          tenantId,
+          batchId: saleItem.batchId,
+          restoreQty,
+          reopenAs: isWholeBatchSaleLine(saleItem) ? 'WAREHOUSE' : 'OPEN',
+        });
+      }
+
       const quantityAfter = await incrementProductStock(tx, {
         tenantId,
         productId: product.id,
-        quantity: ri.quantity,
+        quantity: restoreQty,
       });
 
       await tx.stockMovement.create({
         data: {
           tenantId,
           productId: product.id,
+          batchId: saleItem.batchId,
           movementType: 'RETURN',
-          quantityDelta: ri.quantity,
+          quantityDelta: restoreQty,
           quantityAfter,
           referenceType: 'sale_return',
           referenceId: saleReturn.id,

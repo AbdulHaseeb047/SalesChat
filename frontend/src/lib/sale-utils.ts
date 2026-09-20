@@ -92,7 +92,21 @@ export function formatBatchProductPrice(
 
 export function canAddToCart(product: Product, addQty = 1, currentQty = 0): boolean {
   if (!product.trackStock) return true;
+  // Batch products: availability is open/warehouse batches (modal validates meters).
+  // stockQuantity includes warehouse coils and must not gate loose meter qty.
+  if (product.trackType === 'BATCH') {
+    return (product.batchStockCount ?? 0) > 0;
+  }
   return parseFloat(product.stockQuantity) >= currentQty + addQty;
+}
+
+/** POS badge text: batch products show coil counts, not raw meter totals. */
+export function formatSaleStockBadge(product: Product): string {
+  if (!product.trackStock) return '';
+  if (product.trackType === 'BATCH') {
+    return formatProductStock(product);
+  }
+  return `Qty ${product.stockQuantity}`;
 }
 
 /** Round billed qty to 2dp (matches server). */

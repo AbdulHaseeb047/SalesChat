@@ -2,7 +2,7 @@
 
 Use the old app (`D:\Projects\Raunaq-POS-System`) and this app (`D:\Projects\Raunaq-POS`) against the **same** local Postgres if you want identical data. Otherwise seed both and walk the flows.
 
-Shop login: http://localhost:3000/pos/login  
+Shop login: http://localhost:3003/pos/login  
 Old shop login: http://localhost:5173/login (or whatever Vite used)
 
 ## URL map (old → new)
@@ -31,7 +31,7 @@ Old shop login: http://localhost:5173/login (or whatever Vite used)
 | `/admin/clients` | `/admin/clients` |
 | `/admin/clients/:id` | `/admin/clients/[tenantId]` |
 | `/admin/sales-reps` | `/admin/sales-reps` |
-| `/` `/features` `/pricing` `/about` `/contact` (website) | same paths on :3000 |
+| `/` `/features` `/pricing` `/about` `/contact` (website) | same paths on :3003 |
 
 ## Auth
 
