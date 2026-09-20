@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { TransactionClient } from '../core/prisma.js';
 import { NotFoundError, ValidationError } from '../core/errors.js';
 import { prisma } from '../core/prisma.js';
-import { toDecimal } from '../core/money.js';
+import { toDecimal, formatDisplayDecimal } from '../core/money.js';
 import {
   assertUniqueCompactName,
   compactText,
@@ -517,8 +517,8 @@ export async function getInventorySummary(tenantId: string) {
     healthyCount: healthy,
     lowStockCount: low,
     outOfStockCount: out,
-    inventoryValue: totalValue.toFixed(2),
-    projectedProfit: projectedProfit.toFixed(2),
+    inventoryValue: formatDisplayDecimal(totalValue, 2),
+    projectedProfit: formatDisplayDecimal(projectedProfit, 2),
   };
 }
 
@@ -752,7 +752,7 @@ export async function adjustStock(
     await syncUpdate(tx, SYNC_TABLES.products, updatedProduct);
     await syncInsert(tx, SYNC_TABLES.stockMovements, movement);
 
-    return { productId, stockQuantity: newQty.toFixed(3) };
+    return { productId, stockQuantity: formatDisplayDecimal(newQty, 2) };
   });
 }
 
@@ -782,16 +782,16 @@ function serializeProduct(
     barcode: string | null;
     imageUrl: string | null;
     unit: string;
-    costPrice?: { toFixed: (n: number) => string } | null;
-    sellPrice: { toFixed: (n: number) => string };
-    batchSellPrice?: { toFixed: (n: number) => string } | null;
-    stockQuantity: { toFixed: (n: number) => string };
-    lowStockThreshold: { toFixed: (n: number) => string } | null;
-    taxRate: { toFixed: (n: number) => string };
+    costPrice?: Parameters<typeof formatDisplayDecimal>[0] | null;
+    sellPrice: Parameters<typeof formatDisplayDecimal>[0];
+    batchSellPrice?: Parameters<typeof formatDisplayDecimal>[0] | null;
+    stockQuantity: Parameters<typeof formatDisplayDecimal>[0];
+    lowStockThreshold: Parameters<typeof formatDisplayDecimal>[0] | null;
+    taxRate: Parameters<typeof formatDisplayDecimal>[0];
     expiryDate?: Date | null;
     trackStock: boolean;
     trackType?: string;
-    dispensingLossPercent?: { toFixed: (n: number) => string };
+    dispensingLossPercent?: Parameters<typeof formatDisplayDecimal>[0] | null;
     isActive: boolean;
     category: { id: string; name: string } | null;
     part?: { id: string; name: string } | null;
@@ -809,19 +809,22 @@ function serializeProduct(
     barcode: p.barcode,
     imageUrl: p.imageUrl,
     unit: p.unit,
-    costPrice: p.costPrice?.toFixed(2) ?? null,
-    sellPrice: p.sellPrice.toFixed(2),
-    batchSellPrice: isBatch ? (p.batchSellPrice ?? p.sellPrice).toFixed(2) : null,
-    stockQuantity: p.stockQuantity.toFixed(3),
+    costPrice: p.costPrice != null ? formatDisplayDecimal(p.costPrice, 2) : null,
+    sellPrice: formatDisplayDecimal(p.sellPrice, 2),
+    batchSellPrice: isBatch
+      ? formatDisplayDecimal(p.batchSellPrice ?? p.sellPrice, 2)
+      : null,
+    stockQuantity: formatDisplayDecimal(p.stockQuantity, 2),
     batchStockCount: isBatch ? counts.total : null,
     batchWarehouseCount: isBatch ? counts.warehouse : null,
     batchOpenCount: isBatch ? counts.open : null,
-    lowStockThreshold: p.lowStockThreshold?.toFixed(3) ?? null,
-    taxRate: p.taxRate.toFixed(2),
+    lowStockThreshold:
+      p.lowStockThreshold != null ? formatDisplayDecimal(p.lowStockThreshold, 2) : null,
+    taxRate: formatDisplayDecimal(p.taxRate, 2),
     expiryDate: p.expiryDate?.toISOString().slice(0, 10) ?? null,
     trackStock: p.trackStock,
     trackType: (p.trackType === 'BATCH' ? 'BATCH' : 'SIMPLE') as 'SIMPLE' | 'BATCH',
-    dispensingLossPercent: p.dispensingLossPercent?.toFixed(2) ?? '0.00',
+    dispensingLossPercent: formatDisplayDecimal(p.dispensingLossPercent ?? 0, 2),
     isActive: p.isActive,
     category: p.category,
     part: p.part ?? null,

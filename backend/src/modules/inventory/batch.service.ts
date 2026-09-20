@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { NotFoundError, ValidationError } from '../core/errors.js';
-import { toDecimal } from '../core/money.js';
+import { toDecimal, formatDisplayDecimal } from '../core/money.js';
 import { prisma, type TransactionClient } from '../core/prisma.js';
 import { SYNC_TABLES, syncInsert, syncUpdate } from '../sync/sync-payload.js';
 
@@ -58,14 +58,14 @@ function serializeBatch(b: {
   purchaseDate: Date;
   supplier: string | null;
   purchaseReference: string | null;
-  costPerUnit: { toFixed: (n: number) => string };
-  initialQuantity: { toFixed: (n: number) => string };
-  remainingQuantity: { toFixed: (n: number) => string };
+  costPerUnit: Parameters<typeof formatDisplayDecimal>[0];
+  initialQuantity: Parameters<typeof formatDisplayDecimal>[0];
+  remainingQuantity: Parameters<typeof formatDisplayDecimal>[0];
   status: string;
   notes: string | null;
   closedAt?: Date | null;
-  gasLossQuantity?: { toFixed: (n: number) => string } | null;
-  gasLossCost?: { toFixed: (n: number) => string } | null;
+  gasLossQuantity?: Parameters<typeof formatDisplayDecimal>[0] | null;
+  gasLossCost?: Parameters<typeof formatDisplayDecimal>[0] | null;
   createdAt: Date;
   updatedAt: Date;
   product?: { id: string; name: string; unit: string } | null;
@@ -76,14 +76,15 @@ function serializeBatch(b: {
     purchaseDate: b.purchaseDate.toISOString().slice(0, 10),
     supplier: b.supplier,
     purchaseReference: b.purchaseReference,
-    costPerUnit: b.costPerUnit.toFixed(4),
-    initialQuantity: b.initialQuantity.toFixed(3),
-    remainingQuantity: b.remainingQuantity.toFixed(3),
+    costPerUnit: formatDisplayDecimal(b.costPerUnit, 2),
+    initialQuantity: formatDisplayDecimal(b.initialQuantity, 2),
+    remainingQuantity: formatDisplayDecimal(b.remainingQuantity, 2),
     status: b.status,
     notes: b.notes,
     closedAt: b.closedAt?.toISOString() ?? null,
-    gasLossQuantity: b.gasLossQuantity?.toFixed(3) ?? null,
-    gasLossCost: b.gasLossCost?.toFixed(4) ?? null,
+    gasLossQuantity:
+      b.gasLossQuantity != null ? formatDisplayDecimal(b.gasLossQuantity, 2) : null,
+    gasLossCost: b.gasLossCost != null ? formatDisplayDecimal(b.gasLossCost, 2) : null,
     createdAt: b.createdAt.toISOString(),
     updatedAt: b.updatedAt.toISOString(),
     product: b.product
@@ -646,19 +647,20 @@ async function buildBatchSummary(
     status: batch.status,
     unit: batch.product.unit,
     productName: batch.product.name,
-    purchaseCost: purchaseCost.toFixed(2),
-    revenue: revenue.toFixed(2),
-    cogsSold: cogsSold.toFixed(2),
-    gasLossQuantity: gasLossQty.toFixed(3),
-    gasLossCost: gasLossCost.toFixed(2),
-    netProfit: netProfit.toFixed(2),
+    purchaseCost: formatDisplayDecimal(purchaseCost, 2),
+    revenue: formatDisplayDecimal(revenue, 2),
+    cogsSold: formatDisplayDecimal(cogsSold, 2),
+    gasLossQuantity: formatDisplayDecimal(gasLossQty, 2),
+    gasLossCost: formatDisplayDecimal(gasLossCost, 2),
+    netProfit: formatDisplayDecimal(netProfit, 2),
     saleCount,
-    avgLossPerCharge: avgLossPerCharge?.toFixed(3) ?? null,
-    effectiveLossPercent: effectiveLossPercent.toFixed(2),
+    avgLossPerCharge:
+      avgLossPerCharge != null ? formatDisplayDecimal(avgLossPerCharge, 2) : null,
+    effectiveLossPercent: formatDisplayDecimal(effectiveLossPercent, 2),
     isFinal: isClosed,
-    remainingQuantity: batch.remainingQuantity.toFixed(3),
-    initialQuantity: batch.initialQuantity.toFixed(3),
-    costPerUnit: batch.costPerUnit.toFixed(4),
+    remainingQuantity: formatDisplayDecimal(batch.remainingQuantity, 2),
+    initialQuantity: formatDisplayDecimal(batch.initialQuantity, 2),
+    costPerUnit: formatDisplayDecimal(batch.costPerUnit, 2),
     closedAt: batch.closedAt?.toISOString() ?? null,
   };
 }

@@ -24,7 +24,7 @@ import { api } from '@/lib/api-client';
 import { useDateRangeFilter } from '@/lib/date-range';
 import { FEATURES, hasFeature } from '@/lib/features';
 import { useAuth } from '@/lib/auth';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatQty } from '@/lib/format';
 import { printSaleReceipt } from '@/lib/print-receipt';
 import { downloadSaleInvoicePdf, downloadSalesReportPdf } from '@/lib/sales-pdf';
 import type { SaleDetail, SaleListItem } from '@/types/api';
@@ -530,9 +530,9 @@ export function SalesHistoryPage() {
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-text">{item.productName}</p>
                         <p className="mt-1 text-xs text-text-muted">
-                          Sold {sold}
-                          {returned > 0 ? ` · Already returned ${returned}` : ''} · Can return{' '}
-                          {returnable} · {formatMoney(unitRefund, currency)} each
+                          Sold {formatQty(sold)}
+                          {returned > 0 ? ` · Already returned ${formatQty(returned)}` : ''} · Can
+                          return {formatQty(returnable)} · {formatMoney(unitRefund, currency)} each
                         </p>
                       </div>
                       <div className="flex items-center gap-2">

@@ -106,7 +106,7 @@ export function formatSaleStockBadge(product: Product): string {
   if (product.trackType === 'BATCH') {
     return formatProductStock(product);
   }
-  return `Qty ${product.stockQuantity}`;
+  return `Qty ${formatQty(product.stockQuantity)}`;
 }
 
 /** Round billed qty to 2dp (matches server). */

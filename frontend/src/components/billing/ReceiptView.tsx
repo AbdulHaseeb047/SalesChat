@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import { BRAND } from '@/lib/shared';
 
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatQty } from '@/lib/format';
 import type { SaleDetail } from '@/types/api';
 
 function paymentLabel(method: string): string {
@@ -73,7 +73,7 @@ export function buildReceiptHtml(sale: SaleDetail, currency: string): string {
       return `
       <tr class="item-row">
         <td class="col-item">${i.productName}</td>
-        <td class="col-qty">${qty}</td>
+        <td class="col-qty">${formatQty(qty)}</td>
         <td class="col-rate">${formatMoney(i.unitPrice, currency)}</td>
         <td class="col-amt">${formatMoney(i.lineTotal, currency)}</td>
       </tr>${discRow}`;
@@ -114,7 +114,7 @@ export function buildReceiptHtml(sale: SaleDetail, currency: string): string {
         ${ret.items
           .map(
             (ri) =>
-              `<div class="return-item">${ri.productName} × ${parseFloat(ri.quantity)} (−${formatMoney(ri.refundAmount, currency)})</div>`,
+              `<div class="return-item">${ri.productName} × ${formatQty(ri.quantity)} (−${formatMoney(ri.refundAmount, currency)})</div>`,
           )
           .join('')}
       </div>`,
@@ -392,7 +392,7 @@ export function ReceiptView({ sale, currency }: { sale: SaleDetail; currency: st
               <Fragment key={item.id}>
                 <tr className="border-b border-border/30">
                   <td className="py-1.5 pr-1 leading-tight">{item.productName}</td>
-                  <td className="py-1.5 text-right">{parseFloat(item.quantity)}</td>
+                  <td className="py-1.5 text-right">{formatQty(item.quantity)}</td>
                   <td className="py-1.5 text-right text-text-muted">
                     {formatMoney(item.unitPrice, currency)}
                   </td>
@@ -461,7 +461,7 @@ export function ReceiptView({ sale, currency }: { sale: SaleDetail; currency: st
                   <p className="mt-0.5 text-[9px] text-text-muted">{ret.reason}</p>
                   {ret.items.map((ri) => (
                     <p key={ri.id} className="text-[9px] text-text-muted">
-                      {ri.productName} × {parseFloat(ri.quantity)} (−
+                      {ri.productName} × {formatQty(ri.quantity)} (−
                       {formatMoney(ri.refundAmount, currency)})
                     </p>
                   ))}

@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton, TableSkeleton } from '@/components/ui/PageSkeleton';
 import { QueryError } from '@/components/ui/QueryError';
 import { api } from '@/lib/api-client';
-import { formatDateShort, todayIso } from '@/lib/format';
+import { formatDateShort, formatQty, todayIso } from '@/lib/format';
 
 export function StockMovementsPage() {
   const [from, setFrom] = useState(todayIso());
@@ -107,7 +107,7 @@ export function StockMovementsPage() {
                         className={`px-4 py-3 text-right font-semibold ${up ? 'text-emerald-700' : 'text-rose-700'}`}
                       >
                         {up ? '+' : ''}
-                        {m.quantityDelta}
+                        {formatQty(m.quantityDelta)}
                       </td>
                     </tr>
                   );

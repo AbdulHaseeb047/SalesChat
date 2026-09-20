@@ -13,7 +13,7 @@ import { PageLoader } from '@/components/ui/Spinner';
 import { Select } from '@/components/ui/Select';
 import { useToast } from '@/components/ui/Toast';
 import { api } from '@/lib/api-client';
-import { formatDate, formatMoney } from '@/lib/format';
+import { formatDate, formatMoney, formatQty, formatDecimalInput } from '@/lib/format';
 import type { Supplier, SupplierLedgerEntry } from '@/types/api';
 
 export function SuppliersPage() {
@@ -265,7 +265,7 @@ export function SuppliersPage() {
                               <p className="font-medium">{e.description}</p>
                               {e.stockIn && (
                                 <p className="text-[10px] text-text-muted">
-                                  {parseFloat(e.stockIn.quantity)} {e.stockIn.unit}
+                                  {formatQty(e.stockIn.quantity)} {e.stockIn.unit}
                                   {e.stockIn.sku ? ` · ${e.stockIn.sku}` : ''}
                                 </p>
                               )}
@@ -394,7 +394,7 @@ export function SuppliersPage() {
               setStockForm({
                 ...stockForm,
                 productId: e.target.value,
-                costPrice: p?.costPrice ?? '',
+                costPrice: formatDecimalInput(p?.costPrice),
               });
             }}
             options={[

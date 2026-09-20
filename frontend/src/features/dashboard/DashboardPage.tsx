@@ -19,14 +19,8 @@ import { useAuth } from '@/lib/auth';
 import { resolveDashboardLayout } from '@/lib/dashboard-layout';
 import { useDateRangeFilter } from '@/lib/date-range';
 import { FEATURES, hasFeature } from '@/lib/features';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatQty } from '@/lib/format';
 import type { DashboardWidgetId } from '@/types/api';
-
-function formatQty(value: string) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return value;
-  return n.toLocaleString('en-PK', { maximumFractionDigits: 3 });
-}
 
 const CHART_IDS: DashboardWidgetId[] = [
   'kpis',

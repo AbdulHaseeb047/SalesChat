@@ -35,7 +35,7 @@ function formatMoney(value: number, currency: string) {
 
 function formatUnits(value: number) {
   return value.toLocaleString('en-PK', {
-    maximumFractionDigits: value % 1 === 0 ? 0 : 3,
+    maximumFractionDigits: value % 1 === 0 ? 0 : 2,
   });
 }
 

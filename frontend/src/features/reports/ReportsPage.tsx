@@ -11,7 +11,7 @@ import { api } from '@/lib/api-client';
 import { useDateRangeFilter } from '@/lib/date-range';
 import { FEATURES, hasFeature } from '@/lib/features';
 import { useAuth } from '@/lib/auth';
-import { formatDateShort, formatMoney, todayIso } from '@/lib/format';
+import { formatDateShort, formatMoney, formatQty, todayIso } from '@/lib/format';
 
 function downloadCsv(filename: string, rows: string[][]) {
   const csv = rows
@@ -275,7 +275,7 @@ export function ReportsPage() {
                   {summary?.topProducts.map((p) => (
                     <tr key={p.productId} className="border-t border-border/60">
                       <td className="px-4 py-3 font-medium">{p.name}</td>
-                      <td className="px-4 py-3">{p.quantitySold}</td>
+                      <td className="px-4 py-3">{formatQty(p.quantitySold)}</td>
                       <td className="px-4 py-3 font-semibold">
                         {formatMoney(p.revenue, currency)}
                       </td>
@@ -484,7 +484,7 @@ export function ReportsPage() {
                         className={`px-4 py-3 text-right font-semibold ${up ? 'text-emerald-700' : 'text-rose-700'}`}
                       >
                         {up ? '+' : ''}
-                        {m.quantityDelta}
+                        {formatQty(m.quantityDelta)}
                       </td>
                     </tr>
                   );

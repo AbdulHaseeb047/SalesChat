@@ -32,7 +32,7 @@ import {
 } from '@/lib/csv-utils';
 import { FEATURES, hasFeature } from '@/lib/features';
 import { useAuth } from '@/lib/auth';
-import { formatMoney, formatQty, todayIso } from '@/lib/format';
+import { formatMoney, formatQty, formatDecimalInput, todayIso } from '@/lib/format';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { productMatchesSearch } from '@/lib/search-match';
 import { formatProductStock, formatBatchProductPrice, getStockStatus } from '@/lib/sale-utils';
@@ -822,7 +822,7 @@ export function InventoryPage() {
   const openAdjustBatch = (b: ProductBatch) => {
     setAdjustTarget(b);
     setAdjustForm({
-      remainingQuantity: b.remainingQuantity,
+      remainingQuantity: formatDecimalInput(b.remainingQuantity),
       reason: '',
       markDamaged: false,
     });
@@ -1097,9 +1097,9 @@ export function InventoryPage() {
     setSelected(p);
     setForm({
       name: p.name,
-      sellPrice: p.sellPrice,
-      batchSellPrice: p.batchSellPrice ?? p.sellPrice,
-      costPrice: p.costPrice ?? '',
+      sellPrice: formatDecimalInput(p.sellPrice),
+      batchSellPrice: formatDecimalInput(p.batchSellPrice ?? p.sellPrice),
+      costPrice: formatDecimalInput(p.costPrice),
       barcode: p.barcode ?? '',
       sku: p.sku ?? '',
       imageUrl: canUseProductImages ? (p.imageUrl ?? '') : '',
@@ -1392,7 +1392,7 @@ export function InventoryPage() {
                   <tr key={b.id} className="border-t border-border/60">
                     <td className="px-4 py-2 font-medium">{b.product?.name ?? '—'}</td>
                     <td className="px-4 py-2 font-semibold tabular-nums">
-                      {b.remainingQuantity}
+                      {formatQty(b.remainingQuantity)}
                       <span className="ml-1 font-normal text-text-muted">
                         {b.product?.unit ?? ''}
                       </span>
@@ -2261,9 +2261,9 @@ export function InventoryPage() {
                             <tr className="border-b border-border/60">
                               <td className="px-2 py-2 tabular-nums">{b.purchaseDate}</td>
                               <td className="px-2 py-2 font-semibold tabular-nums">
-                                {b.remainingQuantity}
+                                {formatQty(b.remainingQuantity)}
                                 <span className="ml-1 font-normal text-text-muted">
-                                  / {b.initialQuantity} {selected?.unit}
+                                  / {formatQty(b.initialQuantity)} {selected?.unit}
                                 </span>
                               </td>
                               <td className="px-2 py-2 tabular-nums">
@@ -2367,9 +2367,9 @@ export function InventoryPage() {
                             <tr className="border-b border-border/60">
                               <td className="px-2 py-2 tabular-nums">{b.purchaseDate}</td>
                               <td className="px-2 py-2 font-semibold tabular-nums">
-                                {b.remainingQuantity}
+                                {formatQty(b.remainingQuantity)}
                                 <span className="ml-1 font-normal text-text-muted">
-                                  / {b.initialQuantity} {selected?.unit}
+                                  / {formatQty(b.initialQuantity)} {selected?.unit}
                                 </span>
                               </td>
                               <td className="px-2 py-2 tabular-nums">
@@ -2467,7 +2467,7 @@ export function InventoryPage() {
             <p className="text-sm text-text-muted">
               Bought {closeOutTarget.purchaseDate} ·{' '}
               <strong className="text-text">
-                {closeOutTarget.remainingQuantity} {selected?.unit}
+                {formatQty(closeOutTarget.remainingQuantity)} {selected?.unit}
               </strong>{' '}
               remaining will be written off as gas loss and this cylinder will be closed.
             </p>
@@ -2539,8 +2539,8 @@ export function InventoryPage() {
           >
             <p className="text-sm text-text-muted">
               Bought {adjustTarget.purchaseDate} · booked initial{' '}
-              {adjustTarget.initialQuantity} {selected?.unit}. Current remaining{' '}
-              <strong className="text-text">{adjustTarget.remainingQuantity}</strong>.
+              {formatQty(adjustTarget.initialQuantity)} {selected?.unit}. Current remaining{' '}
+              <strong className="text-text">{formatQty(adjustTarget.remainingQuantity)}</strong>.
             </p>
             <div className="rounded-lg border border-brand-200 bg-brand-50/70 px-3 py-2 text-xs text-brand-950">
               Use this after you physically weigh/measure. Set the real remaining qty — this is{' '}

@@ -1,4 +1,4 @@
-import { formatDate, formatMoney } from '@/lib/format';
+import { formatDate, formatMoney, formatQty } from '@/lib/format';
 import type { SupplierLedgerEntry } from '@/types/api';
 
 export function PurchaseSlipView({
@@ -57,7 +57,7 @@ export function PurchaseSlipView({
           <p className="mt-2 font-semibold text-text">{stock.productName}</p>
           {stock.sku && <p className="text-[10px] text-text-muted">SKU: {stock.sku}</p>}
           <p className="mt-1 text-[10px]">
-            Qty: <strong>{parseFloat(stock.quantity)}</strong> {stock.unit}
+            Qty: <strong>{formatQty(stock.quantity)}</strong> {stock.unit}
           </p>
         </div>
       )}

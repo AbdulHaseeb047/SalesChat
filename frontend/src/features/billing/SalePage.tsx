@@ -20,7 +20,7 @@ import { ApiError, api } from '@/lib/api-client';
 import { prefersDesktopInput, safeFocus } from '@/lib/device';
 import { FEATURES, hasFeature } from '@/lib/features';
 import { useAuth } from '@/lib/auth';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatQty } from '@/lib/format';
 import { printSaleReceipt } from '@/lib/print-receipt';
 import { resolveReceiptAfterSale } from '@/lib/receipt-prefs';
 import { calcSaleTotals, canAddToCart, formatSaleStockBadge, getStockStatus, isBatchProduct, needsBatchSaleModal, looseUnitPrice, wholeBatchPrice, billedQuantity, amountFromQty, qtyFromAmount, roundSoldQty, type BatchSaleMode } from '@/lib/sale-utils';
@@ -484,7 +484,7 @@ export function SalePage() {
       batchOptions.length === 1
     ) {
       setError(
-        `Not enough in this batch (need ${qty.toFixed(3)} ${batchEntryProduct.unit}, have ${selectedBatch.remainingQuantity})`,
+        `Not enough in this batch (need ${formatQty(qty)} ${batchEntryProduct.unit}, have ${formatQty(selectedBatch.remainingQuantity)})`,
       );
       return;
     }
@@ -492,7 +492,7 @@ export function SalePage() {
       const totalOpen = batchOptions.reduce((s, b) => s + parseFloat(b.remainingQuantity), 0);
       if (qty > totalOpen + 0.0001) {
         setError(
-          `Not enough open counter stock (need ${qty.toFixed(3)} ${batchEntryProduct.unit}, have ${totalOpen.toFixed(3)})`,
+          `Not enough open counter stock (need ${formatQty(qty)} ${batchEntryProduct.unit}, have ${formatQty(totalOpen)})`,
         );
         return;
       }
@@ -500,8 +500,8 @@ export function SalePage() {
 
     const batchLabel = selectedBatch
       ? saleMode === 'WHOLE'
-        ? `Whole batch · ${selectedBatch.remainingQuantity} ${batchEntryProduct.unit} · ${formatMoney(price, currency)}`
-        : `${selectedBatch.remainingQuantity} ${batchEntryProduct.unit} left · ${selectedBatch.purchaseDate}`
+        ? `Whole batch · ${formatQty(selectedBatch.remainingQuantity)} ${batchEntryProduct.unit} · ${formatMoney(price, currency)}`
+        : `${formatQty(selectedBatch.remainingQuantity)} ${batchEntryProduct.unit} left · ${selectedBatch.purchaseDate}`
       : undefined;
 
     if (batchEntryEditKey) {
@@ -1244,7 +1244,8 @@ export function SalePage() {
                   </>
                 ) : (
                   <>
-                    {formatMoney(line.unitPrice, currency)} / {line.product.unit} × {line.quantity}
+                    {formatMoney(line.unitPrice, currency)} / {line.product.unit} ×{' '}
+                    {formatQty(line.quantity)}
                   </>
                 )}
                 {line.customName ? ' · Other' : ''}
@@ -1323,7 +1324,7 @@ export function SalePage() {
                     −
                   </button>
                   <span className="min-w-[24px] text-center text-sm font-semibold">
-                    {line.quantity}
+                    {formatQty(line.quantity)}
                   </span>
                   <button
                     type="button"
@@ -2447,7 +2448,7 @@ export function SalePage() {
                   }}
                   options={batchOptions.map((b) => ({
                     value: b.id,
-                    label: `${b.remainingQuantity} ${batchEntryProduct.unit} left · bought ${b.purchaseDate}${b.supplier ? ` · ${b.supplier}` : ''}`,
+                    label: `${formatQty(b.remainingQuantity)} ${batchEntryProduct.unit} left · bought ${b.purchaseDate}${b.supplier ? ` · ${b.supplier}` : ''}`,
                   }))}
                 />
                 {(() => {
@@ -2457,7 +2458,7 @@ export function SalePage() {
                   return (
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm">
                       <p className="text-brand-900">
-                        <strong className="tabular-nums">{selectedBatch.remainingQuantity}</strong>{' '}
+                        <strong className="tabular-nums">{formatQty(selectedBatch.remainingQuantity)}</strong>{' '}
                         {batchEntryProduct.unit} left on this batch
                         {selectedBatch.purchaseDate ? (
                           <span className="text-brand-800/80"> · bought {selectedBatch.purchaseDate}</span>
@@ -2570,7 +2571,7 @@ export function SalePage() {
                   for the whole batch
                   {(() => {
                     const b = batchOptions.find((x) => x.id === batchForm.batchId);
-                    return b ? ` (${b.remainingQuantity} ${batchEntryProduct.unit} removed from stock)` : '';
+                    return b ? ` (${formatQty(b.remainingQuantity)} ${batchEntryProduct.unit} removed from stock)` : '';
                   })()}
                   .
                 </p>

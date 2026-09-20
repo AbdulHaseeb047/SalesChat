@@ -1,22 +1,43 @@
-export function formatMoney(value: string | number, currency = 'PKR'): string {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (Number.isNaN(num)) return `${currency} 0.00`;
-  // en-IN: lakh/crore grouping (1,01,85,070.24) — easier to read for PKR than US grouping
-  return `${currency} ${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-/** Stock/qty display: whole numbers without .000; keep fractions only when needed. */
-export function formatQty(value: string | number | null | undefined, maxFractionDigits = 3): string {
+/** Strip trailing zeros: 100 → "100", 12.5 → "12.5", 12.50 → "12.5" (max 2 dp). */
+export function formatDecimal(
+  value: string | number | null | undefined,
+  maxFractionDigits = 2,
+): string {
   if (value == null || value === '') return '0';
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (!Number.isFinite(num)) return '0';
-  if (Number.isInteger(num) || Math.abs(num - Math.round(num)) < 1e-9) {
-    return String(Math.round(num));
+  const rounded =
+    Math.round(num * Math.pow(10, maxFractionDigits)) / Math.pow(10, maxFractionDigits);
+  if (Number.isInteger(rounded) || Math.abs(rounded - Math.round(rounded)) < 1e-9) {
+    return String(Math.round(rounded));
   }
-  return num.toLocaleString('en-IN', {
-    maximumFractionDigits: maxFractionDigits,
+  return String(parseFloat(rounded.toFixed(maxFractionDigits)));
+}
+
+/** Form/input values from API — empty when null; same rules as formatDecimal. */
+export function formatDecimalInput(
+  value: string | number | null | undefined,
+  maxFractionDigits = 2,
+): string {
+  if (value == null || value === '') return '';
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (!Number.isFinite(num)) return '';
+  return formatDecimal(num, maxFractionDigits);
+}
+
+export function formatMoney(value: string | number, currency = 'PKR'): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (Number.isNaN(num)) return `${currency} 0`;
+  // Whole amounts without .00; fractional amounts up to 2 dp (en-IN grouping for PKR).
+  return `${currency} ${num.toLocaleString('en-IN', {
     minimumFractionDigits: 0,
-  });
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+/** Stock/qty display: whole numbers without .000; at most 2 decimal places. */
+export function formatQty(value: string | number | null | undefined, maxFractionDigits = 2): string {
+  return formatDecimal(value, maxFractionDigits);
 }
 
 export function formatDate(iso: string): string {

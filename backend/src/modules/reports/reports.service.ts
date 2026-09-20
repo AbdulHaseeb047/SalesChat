@@ -1,8 +1,10 @@
 import { Decimal } from '@prisma/client/runtime/library';
 
 import { pkDayKey, resolvePkDateRange, startOfPkDay, endOfPkDay } from '../core/date-bounds.js';
+import { formatDisplayDecimal } from '../core/money.js';
 import { prisma } from '../core/prisma.js';
 import { getUdhaarAging } from '../customers/ledger.service.js';
+import { allocateRevenueByLineShare } from './revenue-allocate.js';
 
 const PK_TZ = 'Asia/Karachi';
 
@@ -245,11 +247,11 @@ export async function getDashboardSummary(
   const lowStockAlerts = lowStockRows.map((p) => ({
     id: p.id,
     name: p.name,
-    stockQuantity: Number(p.stock_quantity).toFixed(3),
-    lowStockThreshold: Number(p.low_stock_threshold).toFixed(3),
+    stockQuantity: formatDisplayDecimal(Number(p.stock_quantity), 2),
+    lowStockThreshold: formatDisplayDecimal(Number(p.low_stock_threshold), 2),
   }));
   const lowStockCount = Number(lowStockCountRow[0]?.count ?? 0);
-  const inventoryValue = Number(inventoryValueRow[0]?.value ?? 0).toFixed(2);
+  const inventoryValue = formatDisplayDecimal(Number(inventoryValueRow[0]?.value ?? 0), 2);
 
   const grossSales = periodSalesAgg._sum.grandTotal ?? new Decimal(0);
   const returnsAmount = periodReturns._sum.totalAmount ?? new Decimal(0);
@@ -281,10 +283,15 @@ export async function getDashboardSummary(
         category: { id: string; name: string } | null;
       } | null;
     }>,
+    saleGrandTotal: { toString(): string } | number | string,
   ) => {
-    for (const item of items) {
+    const allocated = allocateRevenueByLineShare(
+      items.map((i) => i.lineTotal as never),
+      saleGrandTotal as never,
+    );
+    items.forEach((item, index) => {
       const qty = Number(item.quantity);
-      const revenue = Number(item.lineTotal);
+      const revenue = Number(allocated[index] ?? 0);
       const existing = productMap.get(item.productId) ?? {
         name: item.productName,
         revenue: 0,
@@ -305,7 +312,7 @@ export async function getDashboardSummary(
         catRow.revenue += revenue;
         categoryMap.set(cat.id, catRow);
       }
-    }
+    });
   };
 
   if (isSingleDay) {
@@ -330,7 +337,7 @@ export async function getDashboardSummary(
       for (const p of sale.payments) {
         paymentMap.set(p.paymentMethod, (paymentMap.get(p.paymentMethod) ?? 0) + Number(p.amount));
       }
-      accumulateSaleItems(sale.items);
+      accumulateSaleItems(sale.items, sale.grandTotal);
     }
 
     hourlySales = [...hourlyMap.entries()]
@@ -356,7 +363,7 @@ export async function getDashboardSummary(
       for (const p of sale.payments) {
         paymentMap.set(p.paymentMethod, (paymentMap.get(p.paymentMethod) ?? 0) + Number(p.amount));
       }
-      accumulateSaleItems(sale.items);
+      accumulateSaleItems(sale.items, sale.grandTotal);
     }
 
     hourlySales = [...dailyMap.entries()]
@@ -415,10 +422,10 @@ export async function getDashboardSummary(
     lowStockAlerts,
     inventoryValue,
     totalProducts: productCount,
-    outstandingUdhaar: udhaarTotal._sum.balance?.toFixed(2) ?? '0.00',
-    todayReturnsAmount: returnsAmount.toFixed(2),
+    outstandingUdhaar: formatDisplayDecimal(udhaarTotal._sum.balance ?? 0, 2),
+    todayReturnsAmount: formatDisplayDecimal(returnsAmount, 2),
     todayReturnsCount: periodReturns._count,
-    todayReturnedUnits: returnItemsAgg._sum.quantity?.toFixed(3) ?? '0.000',
+    todayReturnedUnits: formatDisplayDecimal(returnItemsAgg._sum.quantity ?? 0, 2),
     hourlySales,
     paymentMethods,
     topProducts,
@@ -574,7 +581,12 @@ export async function getSalesSummary(
     tax = tax.plus(sale.taxTotal);
     discounts = discounts.plus(sale.discountTotal);
 
-    for (const item of sale.items) {
+    const allocated = allocateRevenueByLineShare(
+      sale.items.map((item) => item.lineTotal),
+      sale.grandTotal,
+    );
+
+    sale.items.forEach((item, index) => {
       const unitCost = item.unitCostAtSale ?? item.product.costPrice;
       const qtyForCost = item.quantityDeducted ?? item.quantity;
       const itemCost = unitCost ? unitCost.times(qtyForCost) : new Decimal(0);
@@ -586,9 +598,9 @@ export async function getSalesSummary(
         revenue: 0,
       };
       existing.qty += Number(item.quantity);
-      existing.revenue += Number(item.lineTotal);
+      existing.revenue += Number(allocated[index] ?? 0);
       productMap.set(item.productId, existing);
-    }
+    });
   }
 
   for (const ret of returns) {
@@ -796,17 +808,21 @@ export async function getShopPartsSummary(
   };
 
   for (const sale of sales) {
-    for (const item of sale.items) {
+    const allocated = allocateRevenueByLineShare(
+      sale.items.map((item) => item.lineTotal),
+      sale.grandTotal,
+    );
+    sale.items.forEach((item, index) => {
       const key = shopPartKey(item.partId);
       const row = ensureAgg(key);
-      row.revenue = row.revenue.plus(item.lineTotal);
+      row.revenue = row.revenue.plus(allocated[index] ?? 0);
       row.tax = row.tax.plus(item.taxAmount);
       const unitCost = item.unitCostAtSale ?? item.product.costPrice;
       const qtyForCost = item.quantityDeducted ?? item.quantity;
       const itemCost = unitCost ? unitCost.times(qtyForCost) : new Decimal(0);
       row.cost = row.cost.plus(itemCost);
       row.saleIds.add(sale.id);
-    }
+    });
   }
 
   for (const ret of returns) {
@@ -1001,7 +1017,7 @@ export async function getStockMovementReport(
       id: m.id,
       productName: m.product.name,
       movementType: m.movementType,
-      quantityDelta: m.quantityDelta.toFixed(3),
+      quantityDelta: formatDisplayDecimal(m.quantityDelta, 2),
       createdAt: m.createdAt.toISOString(),
     })),
   };
