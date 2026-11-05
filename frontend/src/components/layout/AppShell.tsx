@@ -94,6 +94,7 @@ const navSections: NavSection[] = [
     title: 'Accounts',
     items: [
       { to: '/pos/customers', label: 'Udhaar', icon: IconWallet, feature: FEATURES.CUSTOMERS_VIEW },
+      { to: '/pos/financial', label: 'Shop cash', icon: IconWallet, feature: FEATURES.REPORTS_VIEW },
       { to: '/pos/staff', label: 'Staff', icon: IconStaff, feature: FEATURES.USERS_MANAGE },
     ],
   },

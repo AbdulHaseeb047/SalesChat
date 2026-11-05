@@ -149,6 +149,7 @@ export interface Product {
   /** Batches open on the counter for loose sales. */
   batchOpenCount?: number | null;
   lowStockThreshold: string | null;
+  targetStock: string | null;
   taxRate: string;
   expiryDate: string | null;
   trackStock: boolean;
@@ -424,6 +425,45 @@ export interface Customer {
   balance: string;
   notes: string | null;
   isActive: boolean;
+}
+
+export interface FinancialEntry {
+  id: string;
+  entryType: string;
+  amount: string;
+  category: string;
+  description: string | null;
+  occurredAt: string;
+  recordedById: string;
+  voidedAt: string | null;
+  voidReason: string | null;
+  flow?: 'in' | 'out' | 'stock' | 'other';
+}
+
+export interface FinancialSummary {
+  from: string | null;
+  to: string | null;
+  inflows: string;
+  outflows: string;
+  netMovement: string;
+  moneyIn?: string;
+  moneyOut?: string;
+  cashLeft?: string;
+  manualInflows: string;
+  manualOutflows: string;
+  salesCollected: string;
+  customerCollections: string;
+  supplierPayments: string;
+  purchasesRecorded: string;
+  stockBought?: string;
+  stillOweSuppliers?: string;
+  ownerPutIn?: string;
+  otherIncome?: string;
+  shopExpenses?: string;
+  ownerTookOut?: string;
+  refunds?: string;
+  cashStockPurchases?: string;
+  byType: Record<string, string>;
 }
 
 export interface LedgerEntry {

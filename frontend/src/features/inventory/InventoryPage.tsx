@@ -61,6 +61,34 @@ function isCounterOpenBatchStatus(status: ProductBatch['status']): boolean {
   return status === 'OPEN';
 }
 
+function thresholdStockQuantity(product: Product): number | null {
+  if (!product.trackStock || product.targetStock == null) return null;
+  const threshold = parseFloat(product.targetStock);
+  return Number.isFinite(threshold) ? threshold : null;
+}
+
+function currentThresholdStockQuantity(product: Product): number {
+  return product.trackType === 'BATCH'
+    ? (product.batchStockCount ?? 0)
+    : parseFloat(product.stockQuantity) || 0;
+}
+
+function thresholdStockUnit(product: Product): string {
+  return product.trackType === 'BATCH' ? 'batches' : product.unit;
+}
+
+function formatThresholdStock(product: Product): string {
+  const threshold = thresholdStockQuantity(product);
+  return threshold == null ? 'Not set' : `${formatQty(threshold)} ${thresholdStockUnit(product)}`;
+}
+
+function formatStockShortage(product: Product): string {
+  const threshold = thresholdStockQuantity(product);
+  if (threshold == null) return '—';
+  const shortage = Math.max(0, threshold - currentThresholdStockQuantity(product));
+  return shortage > 0 ? `${formatQty(shortage)} ${thresholdStockUnit(product)}` : '—';
+}
+
 function daysAgoIso(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
@@ -200,9 +228,12 @@ export function InventoryPage() {
     batchSellPrice: '',
     dispensingLossPercent: '0',
     lowStockThreshold: '',
+    targetStock: '',
   });
   const [formErrorVisible, setFormErrorVisible] = useState(false);
   const [stockDelta, setStockDelta] = useState('');
+  const [stockUnitCost, setStockUnitCost] = useState('');
+  const [recordStockPurchase, setRecordStockPurchase] = useState(true);
   const [batchForm, setBatchForm] = useState({
     purchaseDate: todayIso(),
     supplier: '',
@@ -457,6 +488,7 @@ export function InventoryPage() {
         dispensingLossPercent:
           form.trackType === 'BATCH' ? parseFloat(form.dispensingLossPercent || '0') : 0,
         lowStockThreshold: form.lowStockThreshold ? parseFloat(form.lowStockThreshold) : null,
+        targetStock: form.targetStock ? parseFloat(form.targetStock) : 0,
       };
       return modal === 'edit' && selected
         ? api.products.update(selected.id, body)
@@ -478,9 +510,14 @@ export function InventoryPage() {
       api.products.adjustStock(selected!.id, {
         quantityDelta: parseFloat(stockDelta),
         movementType: 'ADJUSTMENT',
+        unitCost: stockUnitCost ? parseFloat(stockUnitCost) : undefined,
+        recordPurchase: recordStockPurchase && parseFloat(stockDelta) > 0,
       }),
     onSuccess: () => {
       setModal(null);
+      setStockDelta('');
+      setStockUnitCost('');
+      setRecordStockPurchase(true);
       void queryClient.invalidateQueries({ queryKey: ['products'] });
       void queryClient.invalidateQueries({ queryKey: ['batch-stock-counts'] });
       void queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
@@ -1024,6 +1061,7 @@ export function InventoryPage() {
         '',
         '100',
         '10',
+        '20',
         'true',
         '',
       ],
@@ -1087,6 +1125,7 @@ export function InventoryPage() {
       batchSellPrice: '',
       dispensingLossPercent: '0',
       lowStockThreshold: '',
+      targetStock: '',
     });
     setSelected(null);
     setFormErrorVisible(false);
@@ -1113,6 +1152,7 @@ export function InventoryPage() {
       trackType: p.trackType ?? 'SIMPLE',
       dispensingLossPercent: p.dispensingLossPercent ?? '0',
       lowStockThreshold: p.lowStockThreshold ?? '',
+      targetStock: p.targetStock ?? '0',
     });
     setFormErrorVisible(false);
     setModal('edit');
@@ -1124,6 +1164,7 @@ export function InventoryPage() {
   const batchSellPriceNum = parseFloat(form.batchSellPrice);
   const costPriceNum = parseFloat(form.costPrice);
   const lowStockNum = parseFloat(form.lowStockThreshold);
+  const targetStockNum = parseFloat(form.targetStock);
   const isBatchProduct = form.trackType === 'BATCH';
   const productFormErrors = {
     name: !form.name.trim() ? 'Name is required' : '',
@@ -1146,11 +1187,14 @@ export function InventoryPage() {
         ? 'Cost price is required'
         : '',
     lowStockThreshold:
-      !isBatchProduct &&
-      (form.lowStockThreshold.trim() === '' ||
-        !Number.isFinite(lowStockNum) ||
-        lowStockNum < 0)
-        ? 'Low stock threshold is required'
+      form.lowStockThreshold.trim() !== '' &&
+      (!Number.isFinite(lowStockNum) || lowStockNum < 0)
+        ? 'Enter a valid low-stock alert quantity'
+        : '',
+    targetStock:
+      form.targetStock.trim() !== '' &&
+      (!Number.isFinite(targetStockNum) || targetStockNum < 0)
+        ? 'Enter a valid target stock quantity'
         : '',
   };
   const canSaveProduct =
@@ -1158,7 +1202,8 @@ export function InventoryPage() {
     !productFormErrors.sellPrice &&
     !productFormErrors.batchSellPrice &&
     !productFormErrors.costPrice &&
-    !productFormErrors.lowStockThreshold;
+    !productFormErrors.lowStockThreshold &&
+    !productFormErrors.targetStock;
 
   if (listLoading) return <PageSkeleton rows={8} />;
 
@@ -1550,6 +1595,14 @@ export function InventoryPage() {
                       {formatProductStock(p)}
                     </span>
                   </p>
+                  <p>
+                    <span className="text-text-muted">Target </span>
+                    <span className="font-semibold">{formatThresholdStock(p)}</span>
+                  </p>
+                  <p>
+                    <span className="text-text-muted">Need </span>
+                    <span className="font-semibold text-warning">{formatStockShortage(p)}</span>
+                  </p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {canEdit && (
@@ -1605,8 +1658,11 @@ export function InventoryPage() {
                   <tr className="border-b border-border bg-surface-muted text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
                     {canUseShopParts && canEdit && <th className="px-4 py-3 w-10" />}
                     <th className="px-4 py-3">Product</th>
+                    <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3">Price</th>
                     <th className="px-4 py-3">Stock</th>
+                    <th className="px-4 py-3">Target stock</th>
+                    <th className="px-4 py-3">Need</th>
                     {canUseShopParts && <th className="px-4 py-3">Part</th>}
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3" />
@@ -1628,6 +1684,7 @@ export function InventoryPage() {
                         <p className="font-medium text-text">{p.name}</p>
                         <p className="text-xs text-text-muted">{p.barcode || p.sku || '—'}</p>
                       </td>
+                      <td className="px-4 py-3 text-text-muted">{p.sku || 'Not set'}</td>
                       <td className="px-4 py-3">
                         {p.trackType === 'BATCH' ? (
                           <div>
@@ -1654,6 +1711,12 @@ export function InventoryPage() {
                         ) : (
                           '—'
                         )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-text-muted">
+                        {formatThresholdStock(p)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap font-semibold text-warning">
+                        {formatStockShortage(p)}
                       </td>
                       {canUseShopParts && (
                         <td className="px-4 py-3 text-text-muted">{p.part?.name ?? '—'}</td>
@@ -1686,6 +1749,8 @@ export function InventoryPage() {
                             onClick={() => {
                               setSelected(p);
                               setStockDelta('');
+                              setStockUnitCost('');
+                              setRecordStockPurchase(true);
                               setModal('stock');
                             }}
                           >
@@ -2000,17 +2065,28 @@ export function InventoryPage() {
             Track stock
           </label>
           <Input
-            label={isBatchProduct ? 'Low stock threshold (batches)' : 'Low stock threshold'}
+            label={isBatchProduct ? 'Low stock alert level (batches)' : 'Low stock alert level'}
             type="number"
             value={form.lowStockThreshold}
             onChange={(e) => setForm({ ...form, lowStockThreshold: e.target.value })}
-            required={!isBatchProduct}
             hint={
               isBatchProduct
-                ? 'Alert when available batch count falls below this (e.g. 2 batches left)'
-                : undefined
+                ? 'Show a warning when available batches reach this level.'
+                : 'Show a warning when available stock reaches this level.'
             }
             error={formErrorVisible ? productFormErrors.lowStockThreshold || undefined : undefined}
+          />
+          <Input
+            label={isBatchProduct ? 'Target stock to maintain (batches)' : 'Target stock to maintain'}
+            type="number"
+            value={form.targetStock}
+            onChange={(e) => setForm({ ...form, targetStock: e.target.value })}
+            hint={
+              isBatchProduct
+                ? 'Owner-defined quantity to achieve after restocking.'
+                : 'Owner-defined quantity to achieve after restocking.'
+            }
+            error={formErrorVisible ? productFormErrors.targetStock || undefined : undefined}
           />
         </form>
       </Modal>
@@ -2049,6 +2125,26 @@ export function InventoryPage() {
             required
             hint="Press Enter to save"
           />
+          {parseFloat(stockDelta) > 0 && (
+            <>
+              <Input
+                label="Purchase cost per unit"
+                type="number"
+                min="0"
+                value={stockUnitCost}
+                onChange={(e) => setStockUnitCost(e.target.value)}
+                hint="Enter what you paid per piece/kg/meter."
+              />
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={recordStockPurchase}
+                  onChange={(e) => setRecordStockPurchase(e.target.checked)}
+                />
+                Record this as an inventory purchase
+              </label>
+            </>
+          )}
         </form>
       </Modal>
 

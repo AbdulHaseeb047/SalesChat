@@ -19,6 +19,7 @@ const TENANT_SCOPED_MODELS = new Set([
   'CustomerLedgerEntry',
   'CustomerCreditObligation',
   'CustomerPaymentAllocation',
+  'FinancialEntry',
   'Sale',
   'SaleItem',
   'SalePayment',
@@ -82,9 +83,19 @@ async function applyRlsLocalOnTx(tx: {
 
 const DEFAULT_TX_OPTIONS = { maxWait: 15_000, timeout: 60_000 } as const;
 
+function databaseUrlWithConnectionLimit(): string | undefined {
+  const url = process.env.DATABASE_URL;
+  if (!url) return undefined;
+  if (/[?&]connection_limit=/.test(url)) return url;
+  const limit = process.env.PRISMA_CONNECTION_LIMIT?.trim() || '5';
+  return `${url}${url.includes('?') ? '&' : '?'}connection_limit=${encodeURIComponent(limit)}`;
+}
+
 function createPrismaClient(): PrismaClient {
+  const databaseUrl = databaseUrlWithConnectionLimit();
   const base = new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+    ...(databaseUrl ? { datasources: { db: { url: databaseUrl } } } : {}),
   });
 
   const extended = base.$extends({

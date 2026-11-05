@@ -12,6 +12,8 @@ import type {
   DiscountRule,
   DiscountUsageRow,
   FeatureRegistryItem,
+  FinancialEntry,
+  FinancialSummary,
   GiftCard,
   HeldCart,
   InventorySummary,
@@ -644,6 +646,33 @@ export const api = {
       }),
     voidLedger: (customerId: string, entryId: string, reason: string) =>
       apiRequest<{ success: boolean }>(`/customers/${customerId}/ledger/${entryId}/void`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+  },
+
+  financial: {
+    entries: (from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const query = params.toString();
+      return apiRequest<FinancialEntry[]>(`/financial/entries${query ? `?${query}` : ''}`);
+    },
+    summary: (from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const query = params.toString();
+      return apiRequest<FinancialSummary>(`/financial/summary${query ? `?${query}` : ''}`);
+    },
+    create: (body: Record<string, unknown>) =>
+      apiRequest<FinancialEntry>('/financial/entries', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    void: (id: string, reason: string) =>
+      apiRequest<FinancialEntry>(`/financial/entries/${id}/void`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
       }),

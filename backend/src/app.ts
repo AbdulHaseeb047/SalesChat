@@ -17,6 +17,7 @@ import { createCatalogRouter } from './modules/catalog/catalog.routes.js';
 import { prisma } from './modules/core/prisma.js';
 import { createCustomerRouter } from './modules/customers/customers.routes.js';
 import { createInventoryRouter } from './modules/inventory/inventory.routes.js';
+import { createFinancialRouter } from './modules/financial/financial.routes.js';
 import { createPermissionRouter } from './modules/permissions/permissions.routes.js';
 import { createReportRouter } from './modules/reports/reports.routes.js';
 import { createSettingsRouter } from './modules/settings/settings.routes.js';
@@ -84,6 +85,7 @@ export function createApp(): Express {
   app.use(createAdminRouter());
   app.use(createUserRouter());
   app.use(createInventoryRouter());
+  app.use(createFinancialRouter());
   app.use(createCatalogRouter());
   app.use(createBillingRouter());
   app.use(createCustomerRouter());

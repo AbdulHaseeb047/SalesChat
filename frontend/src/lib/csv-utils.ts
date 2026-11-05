@@ -113,6 +113,7 @@ export const INVENTORY_CSV_HEADERS = [
   'supplier',
   'stock_quantity',
   'low_stock_threshold',
+  'target_stock',
   'track_stock',
   'expiry_date',
 ] as const;
@@ -139,6 +140,7 @@ export const INVENTORY_CSV_FIELD_META: Array<{
   { field: 'supplier', label: 'Supplier' },
   { field: 'stock_quantity', label: 'Stock quantity' },
   { field: 'low_stock_threshold', label: 'Low stock threshold' },
+  { field: 'target_stock', label: 'Target stock' },
   { field: 'track_stock', label: 'Track stock' },
   { field: 'expiry_date', label: 'Expiry date' },
 ];
@@ -236,6 +238,7 @@ const HEADER_ALIASES: Record<InventoryCsvField, string[]> = {
     'low_stock',
     'lowstock',
   ],
+  target_stock: ['target_stock', 'targetstock', 'target_quantity', 'stock_target'],
   track_stock: ['track_stock', 'trackstock', 'manage_stock', 'managestock'],
   expiry_date: [
     'expiry_date',
@@ -293,6 +296,7 @@ export interface InventoryCsvRow {
   supplierName?: string | null;
   stockQuantity?: number;
   lowStockThreshold?: number | null;
+  targetStock?: number | null;
   trackStock?: boolean;
   expiryDate?: string | null;
 }
@@ -428,6 +432,7 @@ export function csvRowsToImportProducts(
 
     const stockQty = parseNumber(col('stock_quantity', cells));
     const lowStock = parseNumber(col('low_stock_threshold', cells));
+    const targetStock = parseNumber(col('target_stock', cells));
     const trackStockRaw = col('track_stock', cells);
     const costPrice = parseNumber(col('cost_price', cells));
 
@@ -444,6 +449,7 @@ export function csvRowsToImportProducts(
       supplierName: (col('supplier', cells) || null)?.slice(0, 255) ?? null,
       stockQuantity: stockQty ?? undefined,
       lowStockThreshold: lowStock,
+      targetStock,
       trackStock: trackStockRaw ? parseBool(trackStockRaw) : true,
       expiryDate: col('expiry_date', cells) || null,
     });
@@ -473,6 +479,7 @@ export function productToCsvRow(p: {
   supplier?: { name: string } | null;
   stockQuantity: string;
   lowStockThreshold: string | null;
+  targetStock: string | null;
   trackStock: boolean;
   expiryDate: string | null;
 }): string[] {
@@ -488,6 +495,7 @@ export function productToCsvRow(p: {
     p.supplier?.name ?? '',
     p.stockQuantity,
     p.lowStockThreshold ?? '',
+    p.targetStock ?? '',
     p.trackStock ? 'true' : 'false',
     p.expiryDate ?? '',
   ];

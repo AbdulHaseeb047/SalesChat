@@ -89,6 +89,7 @@ export const productSchema = z.object({
   batchSellPrice: z.number().nonnegative().optional().nullable(),
   taxRate: z.number().nonnegative().optional(),
   lowStockThreshold: z.number().nonnegative().optional().nullable(),
+  targetStock: z.number().nonnegative().optional().nullable(),
   expiryDate: z.string().optional().nullable(),
   trackStock: z.boolean().optional(),
   trackType: z.enum(['SIMPLE', 'BATCH']).optional(),
@@ -99,6 +100,8 @@ export const productSchema = z.object({
 export const stockAdjustSchema = z.object({
   quantityDelta: z.number(),
   movementType: z.enum(['STOCK_IN', 'STOCK_OUT', 'ADJUSTMENT']),
+  unitCost: z.number().nonnegative().optional(),
+  recordPurchase: z.boolean().optional(),
   notes: z.string().optional(),
 });
 
@@ -115,6 +118,7 @@ export const importProductRowSchema = z.object({
   supplierName: z.string().max(255).optional().nullable(),
   stockQuantity: z.number().nonnegative().optional(),
   lowStockThreshold: z.number().nonnegative().optional().nullable(),
+  targetStock: z.number().nonnegative().optional().nullable(),
   trackStock: z.boolean().optional(),
   expiryDate: z.string().optional().nullable(),
 });
@@ -583,6 +587,7 @@ export async function createProduct(tenantId: string, input: z.infer<typeof prod
         taxRate: toDecimal(input.taxRate ?? 0),
         lowStockThreshold:
           input.lowStockThreshold != null ? toDecimal(input.lowStockThreshold) : null,
+        targetStock: toDecimal(input.targetStock ?? 0),
         expiryDate: input.expiryDate ? new Date(input.expiryDate) : null,
         trackStock: input.trackStock ?? true,
         trackType,
@@ -681,7 +686,17 @@ export async function updateProduct(
             : undefined,
         taxRate: input.taxRate != null ? toDecimal(input.taxRate) : undefined,
         lowStockThreshold:
-          input.lowStockThreshold != null ? toDecimal(input.lowStockThreshold) : undefined,
+          input.lowStockThreshold !== undefined
+            ? input.lowStockThreshold == null
+              ? null
+              : toDecimal(input.lowStockThreshold)
+            : undefined,
+        targetStock:
+          input.targetStock !== undefined
+            ? input.targetStock == null
+              ? toDecimal(0)
+              : toDecimal(input.targetStock)
+            : undefined,
         expiryDate:
           input.expiryDate !== undefined
             ? input.expiryDate
@@ -752,6 +767,25 @@ export async function adjustStock(
     await syncUpdate(tx, SYNC_TABLES.products, updatedProduct);
     await syncInsert(tx, SYNC_TABLES.stockMovements, movement);
 
+    if (
+      delta.gt(0) &&
+      input.recordPurchase === true &&
+      input.unitCost != null &&
+      input.unitCost > 0
+    ) {
+      await tx.financialEntry.create({
+        data: {
+          tenantId,
+          entryType: 'INVENTORY_PURCHASE',
+          amount: delta.times(toDecimal(input.unitCost)),
+          category: 'Inventory purchase',
+          description: `Self-purchased stock: ${product.name}`,
+          occurredAt: new Date(),
+          recordedById,
+        },
+      });
+    }
+
     return { productId, stockQuantity: formatDisplayDecimal(newQty, 2) };
   });
 }
@@ -787,6 +821,7 @@ function serializeProduct(
     batchSellPrice?: Parameters<typeof formatDisplayDecimal>[0] | null;
     stockQuantity: Parameters<typeof formatDisplayDecimal>[0];
     lowStockThreshold: Parameters<typeof formatDisplayDecimal>[0] | null;
+    targetStock: Parameters<typeof formatDisplayDecimal>[0] | null;
     taxRate: Parameters<typeof formatDisplayDecimal>[0];
     expiryDate?: Date | null;
     trackStock: boolean;
@@ -820,6 +855,7 @@ function serializeProduct(
     batchOpenCount: isBatch ? counts.open : null,
     lowStockThreshold:
       p.lowStockThreshold != null ? formatDisplayDecimal(p.lowStockThreshold, 2) : null,
+    targetStock: p.targetStock != null ? formatDisplayDecimal(p.targetStock, 2) : null,
     taxRate: formatDisplayDecimal(p.taxRate, 2),
     expiryDate: p.expiryDate?.toISOString().slice(0, 10) ?? null,
     trackStock: p.trackStock,
@@ -921,6 +957,7 @@ export async function importProducts(
           brandId,
           supplierId,
           lowStockThreshold: row.lowStockThreshold ?? null,
+          targetStock: row.targetStock ?? null,
           trackStock: row.trackStock ?? true,
           expiryDate: row.expiryDate ?? null,
         });
@@ -948,6 +985,7 @@ export async function importProducts(
         brandId,
         supplierId,
         lowStockThreshold: row.lowStockThreshold ?? null,
+        targetStock: row.targetStock ?? null,
         trackStock: row.trackStock ?? true,
         expiryDate: row.expiryDate ?? null,
       });
