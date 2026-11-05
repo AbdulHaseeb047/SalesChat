@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 
 import { resolvePkDateRange } from '../core/date-bounds.js';
 import { NotFoundError } from '../core/errors.js';
@@ -24,7 +25,7 @@ export const financialEntrySchema = z.object({
 function serializeEntry(entry: {
   id: string;
   entryType: string;
-  amount: { toString(): string } | number | string;
+  amount: Prisma.Decimal | number | string;
   category: string;
   description: string | null;
   occurredAt: Date;
