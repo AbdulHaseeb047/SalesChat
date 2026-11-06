@@ -1381,7 +1381,7 @@ export function InventoryPage() {
       )}
 
       {summary && (
-        <div className="mb-4 grid gap-3 sm:grid-cols-4">
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="rounded-xl border bg-surface p-3 text-sm">
             <p className="text-text-muted">Healthy</p>
             <p className="text-lg font-bold">{summary.healthyCount}</p>
@@ -1406,6 +1406,17 @@ export function InventoryPage() {
             <p className="text-text-muted">Projected profit</p>
             <p className="text-lg font-bold text-brand-800">
               {formatMoney(summary.projectedProfit, currency)}
+            </p>
+          </div>
+          <div className="rounded-xl border bg-brand-50 p-3 text-sm">
+            <p className="text-text-muted">Amount for target stock</p>
+            <p className="text-lg font-bold text-brand-800">
+              {formatMoney(summary.targetStockAmount, currency)}
+            </p>
+            <p className="mt-1 text-[11px] text-text-muted">
+              {summary.targetStockMissingCostCount > 0
+                ? `${summary.targetStockMissingCostCount} product(s) left out: cost not set`
+                : 'Cost × target stock'}
             </p>
           </div>
         </div>
@@ -1663,6 +1674,7 @@ export function InventoryPage() {
                     <th className="px-4 py-3">Stock</th>
                     <th className="px-4 py-3">Target stock</th>
                     <th className="px-4 py-3">Need</th>
+                    <th className="px-4 py-3">Target amount</th>
                     {canUseShopParts && <th className="px-4 py-3">Part</th>}
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3" />
@@ -1717,6 +1729,15 @@ export function InventoryPage() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap font-semibold text-warning">
                         {formatStockShortage(p)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap font-semibold">
+                        {p.targetStockAmount == null ? (
+                          <span className="font-normal text-text-muted">Cost not set</span>
+                        ) : parseFloat(p.targetStockAmount) > 0 ? (
+                          formatMoney(p.targetStockAmount, currency)
+                        ) : (
+                          '—'
+                        )}
                       </td>
                       {canUseShopParts && (
                         <td className="px-4 py-3 text-text-muted">{p.part?.name ?? '—'}</td>

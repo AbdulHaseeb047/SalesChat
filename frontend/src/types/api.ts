@@ -150,6 +150,8 @@ export interface Product {
   batchOpenCount?: number | null;
   lowStockThreshold: string | null;
   targetStock: string | null;
+  /** Current cost × target stock. Null when a target is set but the cost is unknown. */
+  targetStockAmount?: string | null;
   taxRate: string;
   expiryDate: string | null;
   trackStock: boolean;
@@ -248,6 +250,10 @@ export interface InventorySummary {
   outOfStockCount: number;
   inventoryValue: string;
   projectedProfit: string;
+  /** Sum of current cost × target stock across products. */
+  targetStockAmount: string;
+  /** Products with a target set but no known cost; left out of targetStockAmount. */
+  targetStockMissingCostCount: number;
 }
 
 export interface HeldCart {

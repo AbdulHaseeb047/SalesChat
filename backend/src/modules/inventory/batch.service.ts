@@ -257,6 +257,32 @@ export async function getBatchStockCounts(
   return map;
 }
 
+/** Purchase cost of one batch per product, taken from its most recently purchased batch. */
+export async function getLatestBatchCosts(
+  tenantId: string,
+  productIds?: string[],
+): Promise<Map<string, number>> {
+  if (productIds && productIds.length === 0) return new Map();
+
+  const rows = await prisma.batch.findMany({
+    where: {
+      tenantId,
+      ...(productIds?.length ? { productId: { in: productIds } } : {}),
+    },
+    distinct: ['productId'],
+    orderBy: [{ productId: 'asc' }, { purchaseDate: 'desc' }, { createdAt: 'desc' }],
+    select: { productId: true, costPerUnit: true, initialQuantity: true },
+  });
+
+  // Round to paisa: costPerUnit is stored at 4dp, so 3000 / 90 × 90 would give 2999.997.
+  return new Map(
+    rows.map((b) => [
+      b.productId,
+      Math.round(Number(b.costPerUnit.times(b.initialQuantity)) * 100) / 100,
+    ]),
+  );
+}
+
 /** @deprecated Use getBatchStockCounts — returns warehouse + open combined. */
 export async function getActiveBatchCounts(
   tenantId: string,

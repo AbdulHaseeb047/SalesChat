@@ -12,7 +12,12 @@ import {
 } from '../core/text-match.js';
 import { SYNC_TABLES, syncInsert, syncUpdate } from '../sync/sync-payload.js';
 import { ensureMiscProduct } from '../billing/misc-product.js';
-import { getBatchStockCounts, type BatchStockCounts } from './batch.service.js';
+import {
+  getBatchStockCounts,
+  getLatestBatchCosts,
+  type BatchStockCounts,
+} from './batch.service.js';
+import { calculateTargetStockAmount } from './target-stock.js';
 
 type StockLevel = 'healthy' | 'low' | 'out';
 
@@ -39,10 +44,17 @@ async function serializeProductsWithBatchCounts(
   products: Parameters<typeof serializeProduct>[0][],
 ) {
   const batchIds = products.filter((p) => p.trackType === 'BATCH').map((p) => p.id);
-  const batchCounts =
-    batchIds.length > 0 ? await getBatchStockCounts(tenantId, batchIds) : new Map<string, BatchStockCounts>();
+  const [batchCounts, latestBatchCosts] =
+    batchIds.length > 0
+      ? await Promise.all([
+          getBatchStockCounts(tenantId, batchIds),
+          getLatestBatchCosts(tenantId, batchIds),
+        ])
+      : [new Map<string, BatchStockCounts>(), new Map<string, number>()];
   return products.map((p) =>
-    serializeProduct(p, p.trackType === 'BATCH' ? batchCounts.get(p.id) : undefined),
+    p.trackType === 'BATCH'
+      ? serializeProduct(p, batchCounts.get(p.id), latestBatchCosts.get(p.id))
+      : serializeProduct(p),
   );
 }
 
@@ -50,11 +62,8 @@ async function serializeProductWithBatchCount(
   tenantId: string,
   product: Parameters<typeof serializeProduct>[0],
 ) {
-  const batchCounts =
-    product.trackType === 'BATCH'
-      ? (await getBatchStockCounts(tenantId, [product.id])).get(product.id)
-      : undefined;
-  return serializeProduct(product, batchCounts);
+  const [serialized] = await serializeProductsWithBatchCounts(tenantId, [product]);
+  return serialized!;
 }
 
 export const categorySchema = z.object({
@@ -412,9 +421,7 @@ export async function listProducts(
     );
     const total = filtered.length;
     const pageRows = filtered.slice(skip, skip + pageSize);
-    const data = pageRows.map((p) =>
-      serializeProduct(p, p.trackType === 'BATCH' ? batchCounts.get(p.id) : undefined),
-    );
+    const data = await serializeProductsWithBatchCounts(tenantId, pageRows);
     return {
       data,
       meta: { total, page, pageSize, totalPages: Math.ceil(total / pageSize) },
@@ -438,7 +445,7 @@ export async function listProducts(
 }
 
 export async function getInventorySummary(tenantId: string) {
-  const [products, valuedBatches, batchCounts] = await Promise.all([
+  const [products, valuedBatches, batchCounts, latestBatchCosts] = await Promise.all([
     prisma.product.findMany({
       where: { tenantId, deletedAt: null, isActive: true },
       select: {
@@ -449,6 +456,7 @@ export async function getInventorySummary(tenantId: string) {
         trackStock: true,
         trackType: true,
         lowStockThreshold: true,
+        targetStock: true,
       },
     }),
     prisma.batch.findMany({
@@ -465,6 +473,7 @@ export async function getInventorySummary(tenantId: string) {
       },
     }),
     getBatchStockCounts(tenantId),
+    getLatestBatchCosts(tenantId),
   ]);
 
   const batchValueByProduct = new Map<string, { value: number; qty: number; costSum: number }>();
@@ -483,10 +492,16 @@ export async function getInventorySummary(tenantId: string) {
   let healthy = 0;
   let low = 0;
   let out = 0;
+  let targetStockAmount = 0;
+  let targetStockMissingCostCount = 0;
 
   for (const p of products) {
     const sell = Number(p.sellPrice);
     const qty = Number(p.stockQuantity);
+
+    const targetAmount = calculateTargetStockAmount(p, latestBatchCosts.get(p.id));
+    if (targetAmount == null) targetStockMissingCostCount++;
+    else targetStockAmount += targetAmount;
 
     if (p.trackType === 'BATCH') {
       // Batch value = remaining share of each batch's purchase cost (WAREHOUSE + OPEN).
@@ -523,6 +538,8 @@ export async function getInventorySummary(tenantId: string) {
     outOfStockCount: out,
     inventoryValue: formatDisplayDecimal(totalValue, 2),
     projectedProfit: formatDisplayDecimal(projectedProfit, 2),
+    targetStockAmount: formatDisplayDecimal(targetStockAmount, 2),
+    targetStockMissingCostCount,
   };
 }
 
@@ -834,9 +851,11 @@ function serializeProduct(
     supplier?: { id: string; name: string } | null;
   },
   batchCounts?: BatchStockCounts,
+  latestBatchCost?: number,
 ) {
   const isBatch = p.trackType === 'BATCH';
   const counts = batchCounts ?? { warehouse: 0, open: 0, total: 0 };
+  const targetStockAmount = calculateTargetStockAmount(p, latestBatchCost);
   return {
     id: p.id,
     name: p.name,
@@ -856,6 +875,8 @@ function serializeProduct(
     lowStockThreshold:
       p.lowStockThreshold != null ? formatDisplayDecimal(p.lowStockThreshold, 2) : null,
     targetStock: p.targetStock != null ? formatDisplayDecimal(p.targetStock, 2) : null,
+    targetStockAmount:
+      targetStockAmount != null ? formatDisplayDecimal(targetStockAmount, 2) : null,
     taxRate: formatDisplayDecimal(p.taxRate, 2),
     expiryDate: p.expiryDate?.toISOString().slice(0, 10) ?? null,
     trackStock: p.trackStock,
